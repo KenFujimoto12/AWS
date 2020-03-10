@@ -1,0 +1,80 @@
+## CFn template (at 2020/01: 2010-09-09 is latest)
+AWSTemplateFormatVersion: "2010-09-09"
+## Description
+Description: "add ecs schedule task as batch"
+## Parameters. used case: "!Ref {{ Parameters.[Key] }}"
+Parameters:
+  Env:
+    Type: String
+    Description: "service env ex) dev, stg, prd"
+    Default: ""
+  Project:
+    Type: String
+    Description: ""
+    Default: ""
+  ECSEventRole:
+    Type: String
+    Description: "arn:aws:iam::xxx:role/ECSEventBatchRole"
+    Default: ""
+  ECSTaskDesiredCount:
+    Type: Number
+    Default: 1
+  ECSBatchTaskDefinition:
+    Type: String
+    Description: ""
+  SecurityGroup:
+    Type: "List<AWS::EC2::SecurityGroup::Id>"
+    Description: Existing security group to associate the container instances.
+  SubnetID:
+    Type: "List<AWS::EC2::Subnet::Id>"
+    Description: Select at two subnets in your selected VPC.
+
+#getters用にイベントをつくっています
+#各媒体で必要なバッチは追加してください
+
+###1
+
+Resources:
+  ECSBatchExample:
+    Type: AWS::Events::Rule
+    Description: #スタックの説明
+    Properties:
+      State: ENABLED
+      ScheduleExpression: cron(0 4 * * ? *)
+      Name: #イベント名
+      Description: #説明
+      Targets:
+      - Id: #"example-target"
+        Input: !Sub
+                 - '{
+                        "containerOverrides": [
+                            {
+                                "name": "##"",
+                                "command": [
+                                  ##
+                                ],
+                                "environment": [
+                                    {
+                                        "name": "xxx",
+                                        "value": "${xxx}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }'
+                 - {
+                     xxx: !Ref xxx
+                   }
+        Arn:
+          Fn::ImportValue: "ECSBatchServiceClusterArn"
+        RoleArn: !Ref ECSEventRole
+        EcsParameters:
+          PlatformVersion: LATEST
+          TaskDefinitionArn: !Ref ECSBatchTaskDefinition
+          TaskCount: !Ref ECSTaskDesiredCount
+          LaunchType: FARGATE
+          NetworkConfiguration:
+            AwsVpcConfiguration:
+              SecurityGroups: !Ref SecurityGroup
+              #private subnetを指定(ルートテーブルにnat gatewayを登録します)
+              Subnets: !Ref SubnetID

@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+## Description
+Description: "ecs schedule task as batch"
+
+Parameters:
+  Env:
+    Type: String
+    Description: ""
+    Default: ""
+  Project:
+    Type: String
+    Description: ""
+    Default: ""
+  ECRWebRepositoryUri:
+    Type: String
+    Description: "web repository_uri = registry-url/namespace/image:tag"
+    Default: ""
+
+## Resources. create, modify, etc...
+Resources:
+  TaskIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ecsScheduleTaskExecutionRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AWSOpsWorksCloudWatchLogs
+
+  ECSBatchTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family:
+        !Join
+          - "-"
+          - - !Ref Env
+            - !Ref Project
+            - "batch"
+            - "task"
+      ExecutionRoleArn: !GetAtt TaskIAMRole.Arn
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - "FARGATE"
+      Cpu: 256
+      Memory: 512
+      ContainerDefinitions:
+        -
+          Image:
+            !Ref ECRWebRepositoryUri
+          Name:
+            !Join
+              - "-"
+              - - !Ref Env
+                - !Ref Project
+                - "batch"
+                - "container"
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: true
+              awslogs-region: "ap-northeast-1"
+              awslogs-group: "awslogs-batch"
+              awslogs-stream-prefix: "awslogs-batch"
+          PortMappings:
+            -
+              HostPort: 80
+              Protocol: "tcp"
+              ContainerPort: 80
+          Environment:
+            - Name: xxx
+              Value: xxx

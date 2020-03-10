@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "create s3 bucket for lambda to alarm"
+
+Parameters:
+  Env:
+    Type: String
+    Default: ""
+  Project:
+    Type: String
+    Description: ""
+    Default: ""
+  S3Bucket:
+    Type: String
+    Default: ""
+
+Resources:
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join
+                    - "-"
+                    - - !Ref Env
+                      - !Ref Project
+                      - !Ref S3Bucket
+      AccessControl: Private
+      LoggingConfiguration:
+        DestinationBucketName: !ImportValue LogS3Bucket
+        LogFilePrefix: !Join
+                       - ""
+                       - - "s3-"
+                         - !Ref S3Bucket
+                         - "/"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
