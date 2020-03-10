@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description:
+  ECS service cluster for batch.
+
+Parameters:
+  Env:
+    Type: String
+    Description: "Environment of CAM Service. ex) prd, stg, dev"
+    Default: ""
+  Project:
+    Type: String
+    Description: ""
+
+Resources:
+  ECSCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Join
+      - "-"
+      - - !Ref Env
+        - !Sub
+          - "${Project}-batch-cluster"
+          - {Project: !Ref Project}
+
+Outputs:
+  ExportECSCluster:
+    Description: The ID the ECSCluster
+    Value: !Sub "${Project}-batch-cluster"
+    Export:
+      Name: "ECSBatchServiceCluster"
+  ExportECSClusterArn:
+    Description: The ID of the ECSCluster Arn
+    Value: !GetAtt ECSCluster.Arn
+    Export:
+      Name: "ECSBatchServiceClusterArn"

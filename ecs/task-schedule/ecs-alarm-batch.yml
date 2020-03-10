@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: "2010-09-09"
+## Description
+Description: " alarm for ecs schedule task "
+
+Parameters:
+  Env:
+    Type: String
+    Description: "service env ex) dev, stg, prd"
+    Default: ""
+  Project:
+    Type: String
+    Description: ""
+    Default: ""
+  BatchLogsGroupName:
+    Type: String
+    Description: "ex) awslogs-batch"
+    Default: ""
+  BatchMetricName:
+    Type: String
+    Description: "ex) batch-metric"
+    Default: ""
+  SlackWebhookUrl:
+    Type: String
+    Default: ""
+  S3Bucket:
+    Type: String
+    Default: ""
+
+Resources:
+  CloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Ref BatchLogsGroupName
+
+  ERRORMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref CloudWatchLogGroup
+      FilterPattern: '?ERROR ?error ?Error ?"Error:" ?WARN ?Notice ?Warning ?Fatal'
+      MetricTransformations:
+        -
+          MetricValue: 1
+          MetricNamespace: batch-metric
+          MetricName: !Ref BatchMetricName
+
+  BatchAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Join
+                   - "-"
+                   - - !Ref Env
+                     - !Ref Project
+                     - "batch"
+                     - "alarm"
+                     - "notification"
+      AlarmDescription: "notifications of batch actions ERROR"
+      AlarmActions:
+        - !Ref NotifyBatchErrorToSlackSNS
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 10
+      Threshold: 1
+      Statistic: Average
+      Namespace: batch-metric
+      MetricName: !Ref BatchMetricName
+
+  NotifyBatchErrorToSlackSNS:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Join
+                   - "-"
+                   - - !Ref Env
+                     - !Ref Project
+                     - "notify"
+                     - "batch"
+                     - "error"
+                     - "to"
+                     - "slack"
+      Subscription:
+        - Endpoint: !GetAtt NotifyBatchErrorToSlackFunc.Arn
+          Protocol: lambda
+
+  LambdaIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LambdaNotificationCloudwatchLogRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Description: "lambda role of notifications of batch actions ERROR"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+
+  NotifyBatchErrorToSlackPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt NotifyBatchErrorToSlackFunc.Arn
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref NotifyBatchErrorToSlackSNS
+
+  NotifyBatchErrorToSlackFunc:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: "notify slack of running batch error"
+      FunctionName: !Join
+                      - "-"
+                      - - !Ref Env
+                        - !Ref Project
+                        - "notify"
+                        - "batch"
+                        - "error"
+                        - "to"
+                        - "slack"
+      Handler: notify-batch-error-to-slack.lambda_handler
+      Role: !GetAtt LambdaIAMRole.Arn
+      Runtime: python3.7
+      Timeout: 30
+      Environment:
+        Variables:
+          slackChannel: "#fto_batch_alarm"
+          slackWebHookUr: !Ref SlackWebhookUrl
+          project: !Ref Project
+          env: !Ref Env
+      Code:
+        S3Bucket: !Ref S3Bucket
+        S3Key: batch/notify-batch-error-to-slack.py.zip
