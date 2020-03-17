@@ -1,0 +1,370 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "codepipeline provide build, udate service, deploy flow"
+Parameters:
+  AwsAccountId:
+    Type: String
+    Default: ""
+  AwsRegionName:
+    Type: String
+    Default: ap-northeast-1
+  KmsResourceArn:
+    Type: String
+    Description: "arn:aws:kms:ap-northeast-1:xxx:key/*"
+    Default: ""
+  CodeBuildContainerImage:
+    Type: String
+    Default: "aws/codebuild/amazonlinux2-x86_64-standard:2.0"
+  ArtifactPipelineS3Bucket:
+    Type: String
+    Default: ""
+  GitHubOwner:
+    Type: String
+    Default: cam-inc
+  Repository:
+    Type: String
+    Default: ""
+  Branch:
+    Type: String
+    Default: ""
+  EcrRegistoryUrl:
+    Type: String
+    Default: ""
+  Cpu:
+    Type: Number
+    Default: "256"
+  Memory:
+    Type: Number
+    Default: "512"
+
+
+Resources:
+  ECSCodeBuildIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ECSCodeBuildRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref ECSCodeBuildIAMPolicy
+
+  ECSCodeBuildIAMPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: ECSCodeBuildPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: CloudWatchLogsPolicy
+            Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource:
+              - "*"
+          - Sid: S3GetObjectPolicy
+            Effect: Allow
+            Action:
+              - "s3:GetObject"
+              - "s3:GetObjectVersion"
+            Resource:
+              - "*"
+          - Sid: S3PutObjectPolicy
+            Effect: Allow
+            Action:
+              - "s3:PutObject"
+            Resource:
+              - "*"
+          - Sid: ECRPullPolicy
+            Effect: Allow
+            Action:
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:GetRepositoryPolicy"
+              - "ecr:DescribeRepositories"
+              - "ecr:ListImages"
+              - "ecr:DescribeImages"
+              - "ecr:BatchGetImage"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:UploadLayerPart"
+              - "ecr:CompleteLayerUpload"
+              - "ecr:PutImage"
+            Resource:
+              - "*"
+          - Sid: ECRAuthPolicy
+            Effect: Allow
+            Action:
+              - "ecr:GetAuthorizationToken"
+            Resource:
+              - "*"
+          - Sid: S3BucketIdentity
+            Effect: Allow
+            Action:
+              - "s3:GetBucketAcl"
+              - "s3:GetBucketLocation"
+            Resource:
+              - "*"
+          - Sid: SystemManagerParameterStorePolicy
+            Effect: Allow
+            Action:
+              - "ssm:PutParameter"
+              - "ssm:DeleteParameter"
+              - "ssm:GetParameterHistory"
+              - "ssm:GetParametersByPath"
+              - "ssm:GetParameters"
+              - "ssm:GetParameter"
+              - "ssm:DeleteParameters"
+              - "ssm:DescribeParameters"
+            Resource:
+              - "*"
+          - Sid: SecretManagerPolicy
+            Effect: Allow
+            Action:
+              - "secretsmanager:GetSecretValue"
+            Resource:
+              - "*"
+
+  ECSCodePipelineIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ECSCodePipelineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref ECSCodePipelineIAMPolicy
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+  ECSCodePipelineIAMPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: ECSCodePipelinePolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: CodeBuildPolicyforCodePipeline
+            Effect: Allow
+            Action:
+              - "codebuild:*"
+            Resource:
+              - "*"
+          - Sid: CodeDeployPolicyforCodePipeline
+            Effect: Allow
+            Action:
+              - "codedeploy:*"
+            Resource:
+              - "*"
+          - Sid: S3AccessPolicyforCodePipeline
+            Effect: Allow
+            Action:
+              - "s3:*"
+            Resource:
+              - "*"
+          - Sid: ECRAccessPolicyforCodePipeline
+            Effect: Allow
+            Action:
+              - "ecr:DescribeImages"
+            Resource:
+              - "*"
+          - Sid: ECSAccessPolicyforCodePipeline
+            Effect: Allow
+            Action:
+              - "ecs:DescribeServices"
+              - "ecs:DescribeTaskDefinition"
+              - "ecs:DescribeTasks"
+              - "ecs:ListTasks"
+              - "ecs:RegisterTaskDefinition"
+              - "ecs:UpdateService"
+            Resource:
+              - "*"
+
+  #--------------
+
+  ECSBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: ""
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: ""
+            Value: ""
+        Type: LINUX_CONTAINER
+        Image: !Ref CodeBuildContainerImage
+        PrivilegedMode: true
+#        ImagePullCredentialsType: SERVICE_ROLE
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: codebuild
+          Status: ENABLED
+          StreamName: ""
+      ServiceRole: !GetAtt ECSCodeBuildIAMRole.Arn
+      Source:
+        BuildSpec: #codepipeline/buildspec.yml
+        Type: CODEPIPELINE
+
+  ECSUpdateServiceProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: ""
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: ""
+            Value: ""
+        Type: LINUX_CONTAINER
+        Image: !Ref CodeBuildContainerImage
+        PrivilegedMode: true
+#        ImagePullCredentialsType: SERVICE_ROLE
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: codebuild-update-service
+          Status: ENABLED
+          StreamName: ""
+      ServiceRole: !GetAtt ECSCodeBuildIAMRole.Arn
+      Source:
+        BuildSpec: #codepipeline/updatespec.yml
+        Type: CODEPIPELINE
+
+  ECSPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: ""
+      RoleArn: !GetAtt ECSCodePipelineIAMRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactPipelineS3Bucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: 1
+              OutputArtifacts:
+                - Name: GitHubOutput
+              Namespace: SourceVariables
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref Repository
+                Branch: !Ref Branch
+                OAuthToken: "{{resolve:secretsmanager:xxx:SecretString:xxx}}"
+              RunOrder: 1
+            # - Name: SourceAction
+            #   ActionTypeId:
+            #     Category: Source
+            #     Owner: ThirdParty
+            #     Provider: GitHub
+            #     Version: 1
+            #   OutputArtifacts:
+            #     - Name: GitHubOutputxxx
+            #   Configuration:
+            #     Owner: !Ref GitHubOwner
+            #     Repo: #second repository
+            #     Branch: xxx
+            #     OAuthToken: "{{resolve:secretsmanager:xxx:SecretString:xxx}}"
+            #   RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: GitHubOutput
+                - Name: GitHubOutput
+                - Name: GitHubOutput
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref ECSBuildProject
+                PrimarySource: GitHubOutput
+                EnvironmentVariables: '[{"name": "COMMIT_ID", "type": "PLAINTEXT", "value": "#{SourceVariables.CommitId}"}]'
+              OutputArtifacts:
+                - Name: CodebuildOutput
+              RunOrder: 1
+        - Name: Update
+          Actions:
+            - Name: UpdateService
+              InputArtifacts:
+                - Name: CodebuildOutput
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref ECSUpdateServiceProject
+                EnvironmentVariables:
+                  '[
+                     {"name": "COMMIT_ID", "type": "PLAINTEXT", "value": "#{SourceVariables.CommitId}"}
+                   ]'
+            #   OutputArtifacts:
+            #     - Name: UpdateServiceOutput
+            #   RunOrder: 1
+            # - Name: UpdateService_xxx
+            #   InputArtifacts:
+            #     - Name: CodebuildOutput
+            #   ActionTypeId:
+            #     Category: Build
+            #     Owner: AWS
+            #     Version: 1
+            #     Provider: CodeBuild
+            #   Configuration:
+            #     ProjectName: !Ref ECSUpdateServiceProject
+            #     EnvironmentVariables:
+            #       '[
+            #          {"name": "COMMIT_ID", "type": "PLAINTEXT", "value": "#{SourceVariables.CommitId}"}
+            #        ]'
+            #   OutputArtifacts:
+            #     - Name: UpdateServiceOutputxxx
+            #   RunOrder: 1
+#        - Name: Deploy
+#          Actions:
+#            - Name: CodeDeploy
+#              InputArtifacts:
+#                - Name: UpdateServiceOutput
+#              ActionTypeId:
+#                Category: Deploy
+#                Owner: AWS
+#                Version: 1
+#                Provider: ECS
+#              Configuration:
+#                ClusterName: !Ref ClusterName
+#                ServiceName: xxx
+#                FileName: "imagedefinitions.json"
+#              RunOrder: 1
+#            - Name: CodeDeploy_xxx
+#              InputArtifacts:
+#                - Name: UpdateServiceOutputxxx
+#              ActionTypeId:
+#                Category: Deploy
+#                Owner: AWS
+#                Version: 1
+#                Provider: ECS
+#              Configuration:
+#                ClusterName: !Ref ClusterName
+#                ServiceName: xxx
+#                FileName: "imagedefinitions-xxx.json"
+#              RunOrder: 1
+
+Outputs:
+  CodePipelineName:
+    Value: !Ref ECSPipeline
+    Export:
+      Name: CodePipelineName
