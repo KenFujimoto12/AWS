@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "notify pipeline status"
+Parameters:
+  SlackWebhookUrl:
+    Type: String
+    Default: ""
+
+Resources:
+  CodePipelineStatusCheckEvent:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: CodePipelineStatusCheckEvent
+      EventPattern:
+        source:
+          - aws.codepipeline
+        detail-type:
+          - CodePipeline Pipeline Execution State Change
+        detail:
+          state:
+            - STARTED
+            - SUCCEEDED
+            - FAILED
+          pipeline:
+            - !ImportValue CodePipelineName
+#      RoleArn: !GetAtt CodePipelineStatusCheckEventIAMRole.Arn
+#      Targets:
+#        - Id: "push-codepipeline-status-to-lambda-function"
+#          Arn: !GetAtt NotifyPipelineStatusToSlackFunc.Arn
+      Targets:
+        - Id: "push-codepipeline-status-to-sns-topic"
+          Arn: !Ref NotifyPipelineStatusToSlackSNS
+
+  NotifyPipelineStatusToSlackSNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: SnsAccessPolicy
+            Effect: Allow
+            Action:
+              - "sns:GetTopicAttributes"
+              - "sns:SetTopicAttributes"
+              - "sns:AddPermission"
+              - "sns:RemovePermission"
+              - "sns:DeleteTopic"
+              - "sns:Subscribe"
+              - "sns:ListSubscriptionsByTopic"
+              - "sns:Publish"
+            Principal:
+              AWS: "*"
+            Resource:
+              ##            ここはsnsのトピックarn
+              - !Ref NotifyPipelineStatusToSlackSNS
+          - Sid: EventAccessEventPermissionPolicy
+            Effect: Allow
+            Action:
+              - "sns:Publish"
+            Principal:
+              Service: "events.amazonaws.com"
+            Resource:
+              - !Ref NotifyPipelineStatusToSlackSNS
+      Topics:
+        - !Ref NotifyPipelineStatusToSlackSNS
+
+  NotifyPipelineStatusToSlackSNS:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ""
+      Subscription:
+        - Endpoint: !GetAtt NotifyPipelineStatusToSlackFunc.Arn
+          Protocol: lambda
+
+  NotificationCodePipelineStatusLambdaIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LambdaNotificationCloudwatchLogRoleForCodePipeline
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Description: "lambda role of notifications of batch actions ERROR"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+
+  NotifyPipelineStatusToSlackPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt NotifyPipelineStatusToSlackFunc.Arn
+#      Principal: events.amazonaws.com
+#      SourceArn: !GetAtt CodePipelineStatusCheckEvent.Arn
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref NotifyPipelineStatusToSlackSNS
+
+  NotifyPipelineStatusToSlackFunc:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: "notify build, notify status to slack"
+      FunctionName: ""
+      Handler: notify-pipeline-status-to-slack.lambda_handler
+      Role: !GetAtt NotificationCodePipelineStatusLambdaIAMRole.Arn
+      Runtime: python3.7
+      Timeout: 30
+      Environment:
+        Variables:
+          slackChannel: xxx
+          slackWebHookUr: !Ref SlackWebhookUrl
+      Code:
+        S3Bucket: xxx
+        S3Key: codepipeline/notify-pipeline-status-to-slack.py.zip
