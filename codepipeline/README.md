@@ -38,7 +38,7 @@
 
 # 手順
 
-1. サービス媒体側で以下のファイルを用意します。
+### 1. サービス媒体側で以下のファイルを用意します。
 
 - codepipeline/buildspe.yml  → Dockerfileを元にイメージを作り、ECRにpushします。
 
@@ -49,7 +49,7 @@
 - codepipeline/update_taskdefinition.sh → サービスを更新する際に参照するタスク定義を作成します。
 
 
-2. codepipeline環境を作成する
+### 2. codepipeline環境を作成する
 
 ### ecs-codepipeline.ymlをcloudformationにて実行します。
 
@@ -66,13 +66,13 @@
 ※codepipelineステージも媒体ごとに合わせてください
 
 
-※注意
+### 注意
 
 ソースステージで複数ソースを指定するとcodepipelineが2回動きます。
 
 原因はわかりません。
 
-3. codepipelineのステータス通知環境を作成する。
+### 3. codepipelineのステータス通知環境を作成する。
 
 - codepipeline-status-notification.ymlをcloudformationにて実行します。
 
