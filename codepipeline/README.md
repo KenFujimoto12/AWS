@@ -38,15 +38,15 @@
 
 # 手順
 
-サービス媒体側で以下のファイルを用意します。
+1. サービス媒体側で以下のファイルを用意します。
 
-codepipeline/buildspe.yml  → Dockerfileを元にイメージを作り、ECRにpushします。
+- codepipeline/buildspe.yml  → Dockerfileを元にイメージを作り、ECRにpushします。
 
-Dockerfile 
+- Dockerfile 
 
-codepipeline/updatespec.yml  →  ECRのイメージを参照するようにサービスを更新します。
+- codepipeline/updatespec.yml  →  ECRのイメージを参照するようにサービスを更新します。
 
-codepipeline/update_taskdefinition.sh → サービスを更新する際に参照するタスク定義を作成します。
+- codepipeline/update_taskdefinition.sh → サービスを更新する際に参照するタスク定義を作成します。
 
 
 2. codepipeline環境を作成する
@@ -74,7 +74,7 @@ codepipeline/update_taskdefinition.sh → サービスを更新する際に参�
 
 3. codepipelineのステータス通知環境を作成する。
 
-codepipeline-status-notification.ymlをcloudformationにて実行します。
+- codepipeline-status-notification.ymlをcloudformationにて実行します。
 
 ※パラメーター値は媒体に合わせて入力してください
 
