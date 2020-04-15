@@ -314,9 +314,9 @@ Resources:
                   '[
                      {"name": "COMMIT_ID", "type": "PLAINTEXT", "value": "#{SourceVariables.CommitId}"}
                    ]'
-            #   OutputArtifacts:
-            #     - Name: UpdateServiceOutput
-            #   RunOrder: 1
+              OutputArtifacts:
+                - Name: UpdateServiceOutput
+              RunOrder: 1
             # - Name: UpdateService_xxx
             #   InputArtifacts:
             #     - Name: CodebuildOutput
@@ -334,6 +334,8 @@ Resources:
             #   OutputArtifacts:
             #     - Name: UpdateServiceOutputxxx
             #   RunOrder: 1
+
+# ECSのデプロイの場合、codebuildでデプロイする場合は以下は不要
 #        - Name: Deploy
 #          Actions:
 #            - Name: CodeDeploy
