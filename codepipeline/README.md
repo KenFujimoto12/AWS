@@ -66,12 +66,6 @@
 ※codepipelineステージも媒体ごとに合わせてください
 
 
-### 注意
-
-ソースステージで複数ソースを指定するとcodepipelineが2回動きます。
-
-原因はわかりません。
-
 ### 3. codepipelineのステータス通知環境を作成する。
 
 - codepipeline-status-notification.ymlをcloudformationにて実行します。
