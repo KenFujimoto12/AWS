@@ -1,0 +1,44 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "securitygroup"
+
+Parameters:
+  CidrIps:
+    Type: CommaDelimitedList
+    Description:
+      "example private-subnets) 10.000.000.000/26,10.111.111.111/26"
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+  SecurityGroupId:
+    Type: "AWS::EC2::SecurityGroup::Id"
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: xxx
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          SourceSecurityGroupId: !Ref SecurityGroupId
+        - IpProtocol: TCP
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Select [0, !Ref CidrIps]
+        - IpProtocol: TCP
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Select [1, !Ref CidrIps]
+        - IpProtocol: TCP
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Select [2, !Ref CidrIps]
+        - IpProtocol: TCP
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Select [3, !Ref CidrIps]
+
+Outputs:
+  ecurityGroup:
+    Value: !Ref SecurityGroup
+    Export:
+      Name: ImportSecurityGroup
