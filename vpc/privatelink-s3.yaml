@@ -1,0 +1,22 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "ecr interface endopoint"
+Parameters:
+  RouteTables:
+    Type: "CommaDelimitedList"
+    Description:
+      "example route table) rtb-0000000,rtb-111111"
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+
+Resources:
+  S3GatewayEndpoint:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      RouteTableIds:
+        - !Select [0, !Ref RouteTables]
+        - !Select [1, !Ref RouteTables]
+        - !Select [2, !Ref RouteTables]
+        - !Select [3, !Ref RouteTables]
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      VpcId: !Ref VpcId

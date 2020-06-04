@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "ecr interface endopoint"
+Parameters:
+  SubnetsIds:
+    Type: "List<AWS::EC2::Subnet::Id>"
+    Description: "select connection area subnet.  ex) private subnet"
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+
+Resources:
+  ECRInterfaceEndpoint:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds: xxx
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      SubnetIds: !Ref SubnetsIds
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId 
