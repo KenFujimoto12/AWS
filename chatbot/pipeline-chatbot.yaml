@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS chatbot of codepipeline notification
+
+Parameters:
+  CodepipelineArn:
+    Type: String
+    Description: ex) arn:aws:codepipeline:ap-northeast-1:<accounId>:<pipelineName>
+  SlackChannelId:
+    Type: String
+    Description: ex) https://xxx.slack.com/archives/C0123456789 , SlackChannelId = C0123456789
+    Default: ""
+  SlackWorkspaceId:
+    Type: String
+    Default: ""
+
+Resources:
+  CodepipelineNotification:
+    Type: AWS::CodeStarNotifications::NotificationRule
+    Properties:
+      DetailType: BASIC
+      EventTypeIds:
+        - codepipeline-pipeline-pipeline-execution-started
+        - codepipeline-pipeline-pipeline-execution-failed
+        - codepipeline-pipeline-pipeline-execution-succeeded
+      Name: xxx
+      Resource: !Ref CodepipelineArn
+      Targets:
+        - TargetType: SNS
+          TargetAddress: !Ref NotifyPipelineStatusToSlackSNS
+
+  SNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: CodepipelineNotificationPublishPolicy
+            Effect: Allow
+            Principal:
+              Service:
+              - "codestar-notifications.amazonaws.com"
+            Action:
+              - "SNS:Publish"
+            Resource:
+              - !Ref NotifyPipelineStatusToSlackSNS
+      Topics:
+        - !Ref NotifyPipelineStatusToSlackSNS
+
+  NotifyPipelineStatusToSlackSNS:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: xxx
+      Subscription:
+        - Endpoint: https://global.sns-api.chatbot.amazonaws.com
+          Protocol: HTTPS
+
+  ChatbotIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: xxx
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "chatbot.amazonaws.com"
+                - "management.chatbot.amazonaws.com"
+            Action: sts:AssumeRole
+
+  ChatbotIamPoricy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: xxx
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Resource: "*"
+            Effect: Allow
+            ## allow aws-cli action on slack channel
+            Action:
+              - iam:GetUser
+              - xxx
+      Roles:
+        - !Ref ChatbotIamRole
+
+  Chatbot:
+    Type: AWS::Chatbot::SlackChannelConfiguration
+    Properties:
+      ConfigurationName: xxx
+      IamRoleArn: !GetAtt ChatbotIamRole.Arn
+      SlackChannelId: !Ref SlackChannelId
+      SlackWorkspaceId: !Ref SlackWorkspaceId
+      SnsTopicArns:
+        - !Ref NotifyPipelineStatusToSlackSNS
