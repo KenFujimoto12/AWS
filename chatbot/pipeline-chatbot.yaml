@@ -93,3 +93,4 @@ Resources:
       SlackWorkspaceId: !Ref SlackWorkspaceId
       SnsTopicArns:
         - !Ref NotifyPipelineStatusToSlackSNS
+        
