@@ -29,7 +29,12 @@ phases:
       - >
         docker push
         ## ECR Repository Arn
+      - echo Create taskdefinition template and register it...
+      - sh UpdateTaskdefinition.sh
+      - printf '[{"name":"xxx","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME:xxx > taskdefinition.json
+      - cat taskdefinition.json
+
 artifacts:
   files:
-    - codepipeline/UpdateTaskdefinition.sh
-    - codepipeline/updatespec.yml
+      - taskdefinition.json
+

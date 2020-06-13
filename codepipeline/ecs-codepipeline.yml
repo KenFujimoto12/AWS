@@ -214,30 +214,31 @@ Resources:
         BuildSpec: #codepipeline/buildspec.yml
         Type: CODEPIPELINE
 
-  ECSUpdateServiceProject:
-    Type: AWS::CodeBuild::Project
-    Properties:
-      Name: ""
-      Artifacts:
-        Type: CODEPIPELINE
-      Environment:
-        ComputeType: BUILD_GENERAL1_SMALL
-        EnvironmentVariables:
-          - Name: ""
-            Value: ""
-        Type: LINUX_CONTAINER
-        Image: !Ref CodeBuildContainerImage
-        PrivilegedMode: true
-#        ImagePullCredentialsType: SERVICE_ROLE
-      LogsConfig:
-        CloudWatchLogs:
-          GroupName: codebuild-update-service
-          Status: ENABLED
-          StreamName: ""
-      ServiceRole: !GetAtt ECSCodeBuildIAMRole.Arn
-      Source:
-        BuildSpec: #codepipeline/updatespec.yml
-        Type: CODEPIPELINE
+# CodeDeployを使わない場合
+#   ECSUpdateServiceProject:
+#     Type: AWS::CodeBuild::Project
+#     Properties:
+#       Name: ""
+#       Artifacts:
+#         Type: CODEPIPELINE
+#       Environment:
+#         ComputeType: BUILD_GENERAL1_SMALL
+#         EnvironmentVariables:
+#           - Name: ""
+#             Value: ""
+#         Type: LINUX_CONTAINER
+#         Image: !Ref CodeBuildContainerImage
+#         PrivilegedMode: true
+# #        ImagePullCredentialsType: SERVICE_ROLE
+#       LogsConfig:
+#         CloudWatchLogs:
+#           GroupName: codebuild-update-service
+#           Status: ENABLED
+#           StreamName: ""
+#       ServiceRole: !GetAtt ECSCodeBuildIAMRole.Arn
+#       Source:
+#         BuildSpec: #codepipeline/updatespec.yml
+#         Type: CODEPIPELINE
 
   ECSPipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -298,72 +299,42 @@ Resources:
               OutputArtifacts:
                 - Name: CodebuildOutput
               RunOrder: 1
-        - Name: Update
+        - Name: Deploy
           Actions:
-            - Name: UpdateService
+            - Name: DeployAction
+              ActionTypeId:
+                Category: Deploy
+                Owner:  AWS
+                Version:  1
+                Provider: ECS
+              Configuration:
+                ClusterName: !Ref clusterName
+                ServiceName: !Ref serviceName
+                FileName: taskdefinition.json
               InputArtifacts:
                 - Name: CodebuildOutput
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Version: 1
-                Provider: CodeBuild
-              Configuration:
-                ProjectName: !Ref ECSUpdateServiceProject
-                EnvironmentVariables:
-                  '[
-                     {"name": "COMMIT_ID", "type": "PLAINTEXT", "value": "#{SourceVariables.CommitId}"}
-                   ]'
-              OutputArtifacts:
-                - Name: UpdateServiceOutput
               RunOrder: 1
-            # - Name: UpdateService_xxx
-            #   InputArtifacts:
-            #     - Name: CodebuildOutput
-            #   ActionTypeId:
-            #     Category: Build
-            #     Owner: AWS
-            #     Version: 1
-            #     Provider: CodeBuild
-            #   Configuration:
-            #     ProjectName: !Ref ECSUpdateServiceProject
-            #     EnvironmentVariables:
-            #       '[
-            #          {"name": "COMMIT_ID", "type": "PLAINTEXT", "value": "#{SourceVariables.CommitId}"}
-            #        ]'
-            #   OutputArtifacts:
-            #     - Name: UpdateServiceOutputxxx
-            #   RunOrder: 1
 
-# ECSのデプロイの場合、codebuildでデプロイする場合は以下は不要
-#        - Name: Deploy
-#          Actions:
-#            - Name: CodeDeploy
-#              InputArtifacts:
-#                - Name: UpdateServiceOutput
-#              ActionTypeId:
-#                Category: Deploy
-#                Owner: AWS
-#                Version: 1
-#                Provider: ECS
-#              Configuration:
-#                ClusterName: !Ref ClusterName
-#                ServiceName: xxx
-#                FileName: "imagedefinitions.json"
-#              RunOrder: 1
-#            - Name: CodeDeploy_xxx
-#              InputArtifacts:
-#                - Name: UpdateServiceOutputxxx
-#              ActionTypeId:
-#                Category: Deploy
-#                Owner: AWS
-#                Version: 1
-#                Provider: ECS
-#              Configuration:
-#                ClusterName: !Ref ClusterName
-#                ServiceName: xxx
-#                FileName: "imagedefinitions-xxx.json"
-#              RunOrder: 1
+## CodeDeployを使わない場合は以下
+        # - Name: Update
+        #   Actions:
+        #     - Name: UpdateService
+        #       InputArtifacts:
+        #         - Name: CodebuildOutput
+        #       ActionTypeId:
+        #         Category: Build
+        #         Owner: AWS
+        #         Version: 1
+        #         Provider: CodeBuild
+        #       Configuration:
+        #         ProjectName: !Ref ECSUpdateServiceProject
+        #         EnvironmentVariables:
+        #           '[
+        #              {"name": "COMMIT_ID", "type": "PLAINTEXT", "value": "#{SourceVariables.CommitId}"}
+        #            ]'
+        #       OutputArtifacts:
+        #         - Name: UpdateServiceOutput
+        #       RunOrder: 1
 
 Outputs:
   CodePipelineName:
