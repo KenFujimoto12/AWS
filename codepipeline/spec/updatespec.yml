@@ -1,17 +1,19 @@
-version: 0.2
-run-as: root
+##CodeDeployを使わない場合
 
-phases:
-  build:
-    commands:
-      - echo Create taskdefinition template and register it...
-      - sh UpdateTaskdefinition.sh
-      - aws ecs register-task-definition --cli-input-json file://task-definition.json
+# version: 0.2
+# run-as: root
 
-      - echo Update service ...
-      - >
-        aws ecs
-        update-service
-        --service ##ECS Service Name
-        --cluster ##ECS Cluster Name
-        --task-definition ## Task Definition Name
+# phases:
+#   build:
+#     commands:
+#       - echo Create taskdefinition template and register it...
+#       - sh UpdateTaskdefinition.sh
+#       - aws ecs register-task-definition --cli-input-json file://task-definition.json
+
+#       - echo Update service ...
+#       - >
+#         aws ecs
+#         update-service
+#         --service ##ECS Service Name
+#         --cluster ##ECS Cluster Name
+#         --task-definition ## Task Definition Name
