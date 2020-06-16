@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description:
+  ECS service cluster use spot instance.
+
+Parameters:
+  EcsAmiId:
+    Type: String
+    Description: ECS EC2 AMI id (amazonlinux 2 -> https://docs.aws.amazon.com/ja_jp/AmazonECS/latest/developerguide/ecs-optimized_AMI.html) ex) ami-0e52aad6ac7733a6a
+  EbsVolumeSize:
+    Type: String
+    Description: Disk size of Container Instance.
+    Default: "32"
+  SubnetID:
+    Type: "List<AWS::EC2::Subnet::Id>"
+    Description: Select at two subnets in your selected VPC.
+  AsgMaxSize:
+    Type: Number
+  AsgMinSize:
+    Type: Number
+  AsgDesiredSize:
+    Type: Number
+  AsgOnDemandBase:
+    Type: Number
+  AsgOnDemandPercentage:
+    Type: Number
+  InstanceTypeA:
+    Type: String
+    Description: "Allowed EC2 instance type. priority 1"
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    ConstraintDescription: Please choose a valid instance type
+  InstanceTypeB:
+    Type: String
+    Description: "Allowed EC2 instance type. priority 2"
+    Default: t2.small
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    ConstraintDescription: Please choose a valid instance type.
+  InstanceTypeC:
+    Type: String
+    Description: "Allowed EC2 instance type.priority 3"
+    Default: t2.medium
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    ConstraintDescription: Please choose a valid instance type.
+
+Mappings:
+  EnvSettings:
+    dev:
+      Label: "Dev"
+    stg:
+      Label: "Stg"
+    prd:
+      Label: "Prd"
+
+Resources:
+  ECSAutoScalingGroup:
+    Type: "AWS::AutoScaling::AutoScalingGroup"
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MaxBatchSize: 1
+        MinInstancesInService: 1
+        PauseTime: PT2M
+    Properties:
+      MixedInstancesPolicy:
+        InstancesDistribution:
+          OnDemandBaseCapacity: !Ref AsgOnDemandBase
+          OnDemandPercentageAboveBaseCapacity: !Ref AsgOnDemandPercentage
+          SpotInstancePools: "3"
+        LaunchTemplate:
+          LaunchTemplateSpecification:
+            LaunchTemplateId: !Ref EcsInstanceLc
+            Version: !GetAtt
+              - EcsInstanceLc
+              - LatestVersionNumber
+          Overrides:
+            - InstanceType: !Ref InstanceTypeA
+            - InstanceType: !Ref InstanceTypeB
+            - InstanceType: !Ref InstanceTypeC
+      MetricsCollection:
+        - Granularity: 1Minute
+      VPCZoneIdentifier: !Ref SubnetID
+      MinSize: !Ref AsgMinSize
+      MaxSize: !Ref AsgMaxSize
+      DesiredCapacity: !Ref AsgDesiredSize
+      Tags:
+        - Key: Name
+          Value: xxx
+          PropagateAtLaunch: "true"
+
+  EcsInstanceLc:
+    Type: "AWS::EC2::LaunchTemplate"
+    Properties:
+      LaunchTemplateName: xxx
+      LaunchTemplateData:
+        InstanceInitiatedShutdownBehavior: terminate
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: !Ref EbsVolumeSize
+              DeleteOnTermination: "true"
+        IamInstanceProfile:
+          Name: xxx
+        DisableApiTermination: "false"
+        ImageId: !Ref EcsAmiId
+        UserData:
+          Fn::Base64:
+            !Sub |
+              #!/bin/bash
+              echo xxx >> /etc/ecs/ecs.config
