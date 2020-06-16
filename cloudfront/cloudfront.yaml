@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "cloudfront"
+
+Parameters:
+  CFCertificateArn:
+    Type: String
+    Description: Enter CertificateArn in Virginia region.
+    Default: 'arn:aws:acm:us-east-1:{{aws_account}}:certificate/xxx'
+
+Resources:  
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases: 
+          - !Ref SubDomain
+        Comment: !Ref SubDomain
+        Origins:
+          - DomainName: !GetAtt ALB.DNSName
+            Id: 'default'
+            CustomOriginConfig:
+              HTTPSPort: '443'
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - DELETE
+            - GET
+            - HEAD
+            - OPTIONS
+            - PATCH
+            - POST
+            - PUT
+          TargetOriginId: 'default'
+          ForwardedValues:
+            Headers:
+              - '*'
+            QueryString: True
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+        PriceClass: PriceClass_200
+        Enabled: True
+        Logging:
+          Bucket: xxx
+          IncludeCookies: True
+          Prefix: xxx
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CFCertificateArn
+          SslSupportMethod: sni-only
