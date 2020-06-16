@@ -83,3 +83,7 @@ def lambda_handler(event, context):
             logger.error("Request failed: %d %s", e.code, e.reason)
         except URLError as e:
             logger.error("Server connection failed: %s", e.reason)
+
+        return {
+            'statusCode': 200
+        }
