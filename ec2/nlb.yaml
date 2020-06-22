@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "nlb"
+
+Parameters:
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+    Description: Select a VPC.
+  SubnetID:
+    Type: "List<AWS::EC2::Subnet::Id>"
+    Description: Select at two subnets in your selected VPC.
+
+Resources:
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Port: xxx
+      Protocol: TCP
+
+  NetworkLoadBalancer:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      LoadBalancerAttributes:
+        - Key: load_balancing.cross_zone.enabled
+          Value: True
+      Name: xxx
+      Scheme: internal
+      Subnets: !Ref SubnetID
+      Tags:
+        - Key: xxx
+          Value: xxx
+      Type: network
+
+  TargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: TCP
+      Name: xxx
+      Port: xxx
+      Protocol: TCP
+      TargetType: instance
+      VpcId: !Ref VpcId
