@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: autoscaling policy
+
+Parameters:
+  ECSClusterName:
+    Type: String
+  ECSServiceName:
+    Type: String
+
+Resources:
+  AutoScalingInAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription:
+        when exceeding CPU utilization threshold, this alarm launch
+      AlarmName: xxx
+      ComparisonOperator: LessThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Average
+      Threshold: 20
+      Namespace: AWS/ECS
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: ECSClusterName
+          Value: !Ref ECSClusterName
+        - Name: ECSServiceName
+          Value: !Ref ECSServiceName
+
+  AutoScalingOutAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription:
+        when exceeding CPU utilization threshold, this alarm launch
+      AlarmName: xxx
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Average
+      Threshold: 60
+      Namespace: AWS/ECS
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: ECSClusterName
+          Value: !Ref ECSClusterName
+        - Name: ECSServiceName
+          Value: !Ref ECSServiceName
