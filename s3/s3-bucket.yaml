@@ -1,0 +1,12 @@
+  
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 bucket
+
+Resources:
+  CloudfrontAccessLogS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: xxx
+      VersioningConfiguration:
+        Status: Enabled
+      AccessControl: LogDeliveryWrite
