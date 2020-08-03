@@ -1,0 +1,342 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS Config
+
+Parameters:
+  # LogS3Bucket:
+  #   Type: String
+  ConfigBucketName:
+    Type: String
+  AuthorizedAccountId:
+    Type: String
+  AuthorizedAwsRegion:
+    Type: String
+    Default: "ap-northeast-1"
+  # ConfigTopic:
+  #   Type: String
+  #   Description: "set sns topic arn."
+  AccessKeysRotatedParameterMaxAccessKeyAge:
+    Description: Maximum number of days without rotation. Default 90.
+    Type: String
+    Default: 90
+  CentralMonitoringAccountId:
+    Type: String
+    Description: Comma separated list of AWS Accounts (12-digit) where Amazon GuardDuty
+      results are allowed to be centralized.
+  AllowedDays:
+    Type: String
+    Default: 30
+    Description: Number of days the instance can be stopped for before it becomes
+      non-compliant. The default number of days is 30.
+  DaysToExpiration:
+    Type: String
+    Default: 14
+    Description: Specify the number of days before the rule flags the ACM Certificate
+      as noncompliant.
+  BackupRetentionPeriod:
+    Type: String
+    Default: 10
+    Description: Retention period for backups.
+
+Resources:
+  ConfigBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      AccessControl: "LogDeliveryWrite"
+      BucketName: !Ref ConfigBucketName
+      # LoggingConfiguration:
+      #   DestinationBucketName: !Ref LogS3Bucket
+      #   LogFilePrefix: !Join
+      #     - "-",
+      #     - - s3
+      #       - !Ref ConfigBucketName
+      #       - /
+
+  ConfigBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ConfigBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AWSConfigBucketPermissionsCheck
+            Effect: Allow
+            Principal:
+              Service:
+                - config.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource:
+              - !Sub "arn:aws:s3:::${ConfigBucket}"
+          - Sid: AWSConfigBucketDelivery
+            Effect: Allow
+            Principal:
+              Service:
+                - config.amazonaws.com
+            Action: s3:PutObject
+            Resource:
+              - !Sub "arn:aws:s3:::${ConfigBucket}/AWSLogs/${AWS::AccountId}/*"
+
+  ConfigRecorderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - config.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSConfigRole
+
+  ConfigRecorder:
+    Type: AWS::Config::ConfigurationRecorder
+    DependsOn:
+      - ConfigRecorderRole
+      - ConfigBucketPolicy
+    Properties:
+      Name: configuration-recorder
+      RecordingGroup:
+        AllSupported: false
+        IncludeGlobalResourceTypes: false
+        ResourceTypes:
+          - AWS::EC2::Host
+          - AWS::EC2::Instance
+          - AWS::EC2::NetworkInterface
+          - AWS::S3::Bucket
+          - AWS::S3::AccountPublicAccessBlock
+          - AWS::RDS::DBInstance
+          - AWS::RDS::DBSecurityGroup
+          - AWS::RDS::DBSnapshot
+          - AWS::RDS::DBCluster
+          - AWS::RDS::DBClusterSnapshot
+          - AWS::IAM::User
+          - AWS::IAM::Group
+          - AWS::IAM::Role
+          - AWS::IAM::Policy
+          - AWS::ACM::Certificate
+          - AWS::CloudTrail::Trail
+          - AWS::Lambda::Function
+      RoleARN: !GetAtt ConfigRecorderRole.Arn
+
+  AggregationAuthorization:
+    Type: AWS::Config::AggregationAuthorization
+    Properties:
+      AuthorizedAccountId: !Ref AuthorizedAccountId
+      AuthorizedAwsRegion: !Ref AuthorizedAwsRegion
+
+  DeliveryChannel:
+    Type: AWS::Config::DeliveryChannel
+    DependsOn:
+      - ConfigBucketPolicy
+    Properties:
+      ConfigSnapshotDeliveryProperties:
+        DeliveryFrequency: "Six_Hours"
+      S3BucketName: !Ref ConfigBucket
+      # SnsTopicARN: !Ref ConfigTopic
+
+# ConfigRule
+  RootAccountMFAEnabled:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: RootAccountMFAEnabled
+      Description: Checks whether the root user of your AWS account requires multi-factor authentication for console sign-in.
+      Source:
+        Owner: AWS
+        SourceIdentifier: ROOT_ACCOUNT_MFA_ENABLED
+      MaximumExecutionFrequency: TwentyFour_Hours
+  IAMRootAccessKeyCheck:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: IAMRootAccessKeyCheck
+      Description: Checks whether the root user access key is available. The rule is compliant if the user access key does not exist.
+      Source:
+        Owner: AWS
+        SourceIdentifier: IAM_ROOT_ACCESS_KEY_CHECK
+      MaximumExecutionFrequency: TwentyFour_Hours
+  AccessKeysRotated:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: AccessKeysRotated
+      Description: Checks whether the active access keys are rotated within the number
+        of days specified in maxAccessKeyAge. The rule is non-compliant if the access
+        keys have not been rotated for more than maxAccessKeyAge number of days.
+      InputParameters:
+        maxAccessKeyAge:
+          Ref: AccessKeysRotatedParameterMaxAccessKeyAge
+      Source:
+        Owner: AWS
+        SourceIdentifier: ACCESS_KEYS_ROTATED
+      MaximumExecutionFrequency: TwentyFour_Hours
+  S3BucketPublicReadProhibited:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: S3BucketPublicReadProhibited
+      Description: Checks that your Amazon S3 buckets do not allow public read access.
+        The rule checks the Block Public Access settings, the bucket policy, and the
+        bucket access control list (ACL).
+      Scope:
+        ComplianceResourceTypes:
+        - "AWS::S3::Bucket"
+      Source:
+        Owner: AWS
+        SourceIdentifier: S3_BUCKET_PUBLIC_READ_PROHIBITED
+      MaximumExecutionFrequency: TwentyFour_Hours
+  S3BucketPublicWriteProhibited:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: S3BucketPublicWriteProhibited
+      Description: "Checks that your Amazon S3 buckets do not allow public write access.
+      The rule checks the Block Public Access settings,
+      the bucket policy, and the bucket access control list (ACL)."
+      Scope:
+        ComplianceResourceTypes:
+        - "AWS::S3::Bucket"
+      Source:
+        Owner: AWS
+        SourceIdentifier: S3_BUCKET_PUBLIC_WRITE_PROHIBITED
+      MaximumExecutionFrequency: TwentyFour_Hours
+  S3BucketLoggingEnabled:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: S3BucketLoggingEnabled
+      Description: "Checks whether logging is enabled for your S3 buckets."
+      Scope:
+        ComplianceResourceTypes:
+        - "AWS::S3::Bucket"
+      Source:
+        Owner: AWS
+        SourceIdentifier: S3_BUCKET_LOGGING_ENABLED
+  MultiRegionCloudtrailEnabled:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: MultiRegionCloudtrailEnabled
+      Description: Checks that there is at least one multi-region AWS CloudTrail.
+        The rule is non-compliant if the trails do not match input parameters
+      Source:
+        Owner: AWS
+        SourceIdentifier: MULTI_REGION_CLOUD_TRAIL_ENABLED
+      MaximumExecutionFrequency: TwentyFour_Hours
+  GuarddutyEnabledCentralized:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: GuarddutyEnabledCentralized
+      Description: Checks whether GuardDuty is enabled. You can optionally verify
+        that the results are centralized in a specific AWS Account.
+      InputParameters:
+        CentralMonitoringAccount: !Ref CentralMonitoringAccountId
+      Source:
+        Owner: AWS
+        SourceIdentifier: GUARDDUTY_ENABLED_CENTRALIZED
+      MaximumExecutionFrequency: TwentyFour_Hours
+  Ec2StoppedInstance:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: Ec2StoppedInstance
+      Description: Checks whether there are instances stopped for more than the allowed
+        number of days.
+      InputParameters:
+        AllowedDays: !Ref AllowedDays
+      Source:
+        Owner: AWS
+        SourceIdentifier: EC2_STOPPED_INSTANCE
+      MaximumExecutionFrequency: TwentyFour_Hours
+  AcmCertificateExpirationCheck:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: AcmCertificateExpirationCheck
+      Description: Checks whether ACM Certificates in your account are marked for
+        expiration within the specified number of days. Certificates provided by ACM
+        are automatically renewed. ACM does not automatically renew certificates that
+        you import.
+      InputParameters:
+        daysToExpiration: !Ref DaysToExpiration
+      Scope:
+        ComplianceResourceTypes:
+        - AWS::ACM::Certificate
+      Source:
+        Owner: AWS
+        SourceIdentifier: ACM_CERTIFICATE_EXPIRATION_CHECK
+      MaximumExecutionFrequency: TwentyFour_Hours
+  DbInstanceBackupEnabled:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: DbInstanceBackupEnabled
+      Description: Checks whether RDS DB instances have backups enabled.
+      InputParameters:
+        backupRetentionPeriod: !Ref BackupRetentionPeriod
+      Scope:
+        ComplianceResourceTypes:
+        - AWS::RDS::DBInstance
+      Source:
+        Owner: AWS
+        SourceIdentifier: DB_INSTANCE_BACKUP_ENABLED
+  RdsInstancePublicAccessCheck:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: RdsInstancePublicAccessCheck
+      Description: Checks whether the Amazon Relational Database Service (RDS) instances
+        are not publicly accessible. The rule is non-compliant if the publiclyAccessible
+        field is true in the instance configuration item.
+      Scope:
+        ComplianceResourceTypes:
+        - AWS::RDS::DBInstance
+      Source:
+        Owner: AWS
+        SourceIdentifier: RDS_INSTANCE_PUBLIC_ACCESS_CHECK
+  RdsSnapshotsPublicProhibited:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: RdsSnapshotsPublicProhibited
+      Description: Checks if Amazon Relational Database Service (Amazon RDS) snapshots
+        are public. The rule is non-compliant if any existing and new Amazon RDS snapshots
+        are public.
+      Scope:
+        ComplianceResourceTypes:
+        - AWS::RDS::DBSnapshot
+        - AWS::RDS::DBClusterSnapshot
+      Source:
+        Owner: AWS
+        SourceIdentifier: RDS_SNAPSHOTS_PUBLIC_PROHIBITED
+  RdsEnhancedMonitoringEnabled:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigRecorder
+    Properties:
+      ConfigRuleName: RdsEnhancedMonitoringEnabled
+      Description: Checks whether enhanced monitoring is enabled for Amazon Relational
+        Database Service (Amazon RDS) instances.
+      Scope:
+        ComplianceResourceTypes:
+        - AWS::RDS::DBInstance
+      Source:
+        Owner: AWS
+        SourceIdentifier: RDS_ENHANCED_MONITORING_ENABLED
