@@ -1,19 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: AWS Config
+Description: Config
 
 Parameters:
-  # LogS3Bucket:
-  #   Type: String
   ConfigBucketName:
     Type: String
   AuthorizedAccountId:
     Type: String
+    Description: "set aggregator fo conifg account id"
   AuthorizedAwsRegion:
     Type: String
     Default: "ap-northeast-1"
-  # ConfigTopic:
-  #   Type: String
-  #   Description: "set sns topic arn."
   AccessKeysRotatedParameterMaxAccessKeyAge:
     Description: Maximum number of days without rotation. Default 90.
     Type: String
@@ -43,13 +39,6 @@ Resources:
     Properties:
       AccessControl: "LogDeliveryWrite"
       BucketName: !Ref ConfigBucketName
-      # LoggingConfiguration:
-      #   DestinationBucketName: !Ref LogS3Bucket
-      #   LogFilePrefix: !Join
-      #     - "-",
-      #     - - s3
-      #       - !Ref ConfigBucketName
-      #       - /
 
   ConfigBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -105,6 +94,7 @@ Resources:
           - AWS::EC2::Host
           - AWS::EC2::Instance
           - AWS::EC2::NetworkInterface
+          - AWS::EC2::SecurityGroup
           - AWS::S3::Bucket
           - AWS::S3::AccountPublicAccessBlock
           - AWS::RDS::DBInstance
@@ -119,6 +109,7 @@ Resources:
           - AWS::ACM::Certificate
           - AWS::CloudTrail::Trail
           - AWS::Lambda::Function
+          - AWS::Config::ResourceCompliance
       RoleARN: !GetAtt ConfigRecorderRole.Arn
 
   AggregationAuthorization:
@@ -135,7 +126,6 @@ Resources:
       ConfigSnapshotDeliveryProperties:
         DeliveryFrequency: "Six_Hours"
       S3BucketName: !Ref ConfigBucket
-      # SnsTopicARN: !Ref ConfigTopic
 
 # ConfigRule
   RootAccountMFAEnabled:
@@ -340,3 +330,16 @@ Resources:
       Source:
         Owner: AWS
         SourceIdentifier: RDS_ENHANCED_MONITORING_ENABLED
+  VpcSgOpenOnlyToAuthorizedPorts:
+    DependsOn:
+      - ConfigRecorder
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: VpcSgOpenOnlyToAuthorizedPorts
+      Description: Checks whether the security group with 0.0.0.0/0 of any Amazon Virtual Private Cloud (Amazon VPC) allows only specific inbound TCP or UDP traffic. 
+      Scope:
+        ComplianceResourceTypes:
+        - AWS::EC2::SecurityGroup
+      Source:
+        Owner: AWS
+        SourceIdentifier: VPC_SG_OPEN_ONLY_TO_AUTHORIZED_PORTS
