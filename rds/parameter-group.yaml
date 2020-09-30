@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:
+  Aurora Mysql ParameterGroup SubnetGroup
+
+Parameters:
+  SubnetID:
+    Type: "List<AWS::EC2::Subnet::Id>"
+    Description: Select at two subnets in your selected VPC.
+
+Resources:
+  AuroraMysqlPrivateSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Private Network"
+      SubnetIds: !Ref SubnetID
+      Tags:
+        - Key: xxx
+          Value: xxx
+
+  AuroraMysqlParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: xxx
+      Family: aurora-mysql5.7
+      Parameters:
+        max_connections: 20000
+      Tags:
+        - Key: xxx
+          Value: xxx
+
+  AuroraMysqlClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      Description: xxx
+      Family: aurora-mysql5.7
+      Parameters:
+        character_set_client: utf8mb4
+        character_set_connection: utf8mb4
+        character_set_database: utf8mb4
+        character_set_filesystem: utf8mb4
+        character_set_results: utf8mb4
+        character_set_server: utf8mb4
+        max_connections: 20000
+        ## binary log 
+        binlog_format: MIXED
+      Tags:
+        - Key: xxx
+          Value: xxx
