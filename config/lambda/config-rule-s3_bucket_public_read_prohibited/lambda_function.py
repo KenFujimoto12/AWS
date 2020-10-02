@@ -141,25 +141,6 @@ def evaluate_compliance(event, configuration_item, valid_rule_parameters):
     
     evaluations.append(build_evaluation(bucketName, 'COMPLIANT', event))
     return evaluations
-    
-    ## original proccessing
-    # client = get_client('s3control', event)
-    # response = client.get_public_access_block(AccountId=event['accountId'])
-    # evaluations = []
-
-    # if (response['PublicAccessBlockConfiguration']['BlockPublicAcls'] == valid_rule_parameters['BlockPublicAcls']) \
-    # and (response['PublicAccessBlockConfiguration']['IgnorePublicAcls'] == valid_rule_parameters['IgnorePublicAcls']) \
-    # and (response['PublicAccessBlockConfiguration']['BlockPublicPolicy'] == valid_rule_parameters['BlockPublicPolicy']) \
-    # and (response['PublicAccessBlockConfiguration']['RestrictPublicBuckets'] == valid_rule_parameters['RestrictPublicBuckets']):
-    #     evaluations.append(build_evaluation(event['accountId'], 'COMPLIANT', event))
-
-    # else:
-    #     annotationbuilder = 'BlockPublicAcls:' + str(response['PublicAccessBlockConfiguration']['BlockPublicAcls']) + ' ' \
-    #     'IgnorePublicAcls:' + str(response['PublicAccessBlockConfiguration']['IgnorePublicAcls']) + ' ' \
-    #     'BlockPublicPolicy:' + str(response['PublicAccessBlockConfiguration']['BlockPublicPolicy']) + ' ' \
-    #     'RestrictPublicBuckets:' + str(response['PublicAccessBlockConfiguration']['RestrictPublicBuckets'])
-    #     evaluations.append(build_evaluation(event['accountId'], 'NON_COMPLIANT', event, annotation=annotationbuilder))
-    # return evaluations
 
 def evaluate_parameters(rule_parameters):
 
@@ -389,7 +370,6 @@ def clean_up_old_evaluations(latest_evaluations, event):
     return cleaned_evaluations + latest_evaluations
 
 def lambda_handler(event, context):
-    print(event)
     if 'liblogging' in sys.modules:
         liblogging.logEvent(event)
 
