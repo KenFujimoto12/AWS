@@ -4,6 +4,7 @@ Description: Config
 Parameters:
   ConfigBucketName:
     Type: String
+    Default: xxx
   AuthorizedAccountId:
     Type: String
     Description: "set aggregator fo conifg account id"
@@ -32,6 +33,12 @@ Parameters:
     Type: String
     Default: 10
     Description: Retention period for backups.
+  AuthorizedTcpPorts:
+    Type: String
+    Default: 80,443
+  ConfigRuleLambdaBucket:
+    Type: String
+    Default: xxx
 
 Resources:
   ConfigBucket:
@@ -78,7 +85,7 @@ Resources:
               - sts:AssumeRole
       Path: /
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSConfigRole
+        - arn:aws:iam::aws:policy/service-role/AWS_ConfigRole
 
   ConfigRecorder:
     Type: AWS::Config::ConfigurationRecorder
@@ -166,22 +173,6 @@ Resources:
         Owner: AWS
         SourceIdentifier: ACCESS_KEYS_ROTATED
       MaximumExecutionFrequency: TwentyFour_Hours
-  S3BucketPublicReadProhibited:
-    Type: AWS::Config::ConfigRule
-    DependsOn:
-      - ConfigRecorder
-    Properties:
-      ConfigRuleName: S3BucketPublicReadProhibited
-      Description: Checks that your Amazon S3 buckets do not allow public read access.
-        The rule checks the Block Public Access settings, the bucket policy, and the
-        bucket access control list (ACL).
-      Scope:
-        ComplianceResourceTypes:
-        - "AWS::S3::Bucket"
-      Source:
-        Owner: AWS
-        SourceIdentifier: S3_BUCKET_PUBLIC_READ_PROHIBITED
-      MaximumExecutionFrequency: TwentyFour_Hours
   S3BucketPublicWriteProhibited:
     Type: AWS::Config::ConfigRule
     DependsOn:
@@ -198,19 +189,6 @@ Resources:
         Owner: AWS
         SourceIdentifier: S3_BUCKET_PUBLIC_WRITE_PROHIBITED
       MaximumExecutionFrequency: TwentyFour_Hours
-  S3BucketLoggingEnabled:
-    Type: AWS::Config::ConfigRule
-    DependsOn:
-      - ConfigRecorder
-    Properties:
-      ConfigRuleName: S3BucketLoggingEnabled
-      Description: "Checks whether logging is enabled for your S3 buckets."
-      Scope:
-        ComplianceResourceTypes:
-        - "AWS::S3::Bucket"
-      Source:
-        Owner: AWS
-        SourceIdentifier: S3_BUCKET_LOGGING_ENABLED
   MultiRegionCloudtrailEnabled:
     Type: AWS::Config::ConfigRule
     DependsOn:
@@ -222,34 +200,6 @@ Resources:
       Source:
         Owner: AWS
         SourceIdentifier: MULTI_REGION_CLOUD_TRAIL_ENABLED
-      MaximumExecutionFrequency: TwentyFour_Hours
-  GuarddutyEnabledCentralized:
-    Type: AWS::Config::ConfigRule
-    DependsOn:
-      - ConfigRecorder
-    Properties:
-      ConfigRuleName: GuarddutyEnabledCentralized
-      Description: Checks whether GuardDuty is enabled. You can optionally verify
-        that the results are centralized in a specific AWS Account.
-      InputParameters:
-        CentralMonitoringAccount: !Ref CentralMonitoringAccountId
-      Source:
-        Owner: AWS
-        SourceIdentifier: GUARDDUTY_ENABLED_CENTRALIZED
-      MaximumExecutionFrequency: TwentyFour_Hours
-  Ec2StoppedInstance:
-    Type: AWS::Config::ConfigRule
-    DependsOn:
-      - ConfigRecorder
-    Properties:
-      ConfigRuleName: Ec2StoppedInstance
-      Description: Checks whether there are instances stopped for more than the allowed
-        number of days.
-      InputParameters:
-        AllowedDays: !Ref AllowedDays
-      Source:
-        Owner: AWS
-        SourceIdentifier: EC2_STOPPED_INSTANCE
       MaximumExecutionFrequency: TwentyFour_Hours
   AcmCertificateExpirationCheck:
     Type: AWS::Config::ConfigRule
@@ -316,20 +266,6 @@ Resources:
       Source:
         Owner: AWS
         SourceIdentifier: RDS_SNAPSHOTS_PUBLIC_PROHIBITED
-  RdsEnhancedMonitoringEnabled:
-    Type: AWS::Config::ConfigRule
-    DependsOn:
-      - ConfigRecorder
-    Properties:
-      ConfigRuleName: RdsEnhancedMonitoringEnabled
-      Description: Checks whether enhanced monitoring is enabled for Amazon Relational
-        Database Service (Amazon RDS) instances.
-      Scope:
-        ComplianceResourceTypes:
-        - AWS::RDS::DBInstance
-      Source:
-        Owner: AWS
-        SourceIdentifier: RDS_ENHANCED_MONITORING_ENABLED
   VpcSgOpenOnlyToAuthorizedPorts:
     DependsOn:
       - ConfigRecorder
@@ -337,9 +273,94 @@ Resources:
     Properties:
       ConfigRuleName: VpcSgOpenOnlyToAuthorizedPorts
       Description: Checks whether the security group with 0.0.0.0/0 of any Amazon Virtual Private Cloud (Amazon VPC) allows only specific inbound TCP or UDP traffic. 
+      InputParameters:
+        authorizedTcpPorts: !Ref AuthorizedTcpPorts
       Scope:
         ComplianceResourceTypes:
         - AWS::EC2::SecurityGroup
       Source:
         Owner: AWS
         SourceIdentifier: VPC_SG_OPEN_ONLY_TO_AUTHORIZED_PORTS
+  S3BucketPublicReadProhibited:
+    Type: AWS::Config::ConfigRule
+    DependsOn:
+      - ConfigPermissionToCallLambda
+    Properties:
+      ConfigRuleName: S3BucketPublicReadProhibited
+      Description: Checks that your Amazon S3 buckets do not allow public read access.
+        The rule checks the Block Public Access settings, the bucket policy, and the
+        bucket access control list (ACL).
+      Scope:
+        ComplianceResourceTypes:
+        - "AWS::S3::Bucket"
+      Source:
+        Owner: "CUSTOM_LAMBDA"
+        SourceDetails:
+          - EventSource: "aws.config"
+            MessageType: "ScheduledNotification"
+        SourceIdentifier: !GetAtt ConfigRuleFunctionForS3BucketPublicReadProhibited.Arn
+      MaximumExecutionFrequency: TwentyFour_Hours
+
+  ConfigPermissionToCallLambda: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !GetAtt ConfigRuleFunctionForS3BucketPublicReadProhibited.Arn
+      Action: "lambda:InvokeFunction"
+      Principal: "config.amazonaws.com"
+
+  CustomCofingRuleLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CustomConfigRulePolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub "arn:aws:logs:ap-northeast-1:${AWS::AccountId}:log-group:/aws/lambda/*"
+          - Effect: "Allow"
+            Action: logs:CreateLogGroup
+            Resource: !Sub "arn:aws:logs:ap-northeast-1:${AWS::AccountId}:*"
+          - Effect: "Allow"
+            Action:
+              - iam:GenerateCredentialReport
+              - iam:GenerateServiceLastAccessedDetails
+              - iam:Get*
+              - iam:List*
+              - iam:SimulateCustomPolicy
+              - iam:SimulatePrincipalPolicy
+            Resource: "*"
+      Roles:
+        - !Ref CustomConfigRuleLambdaRole
+
+  CustomConfigRuleLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CustomConfigRuleRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWS_ConfigRole
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+  ConfigRuleFunctionForS3BucketPublicReadProhibited:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Join
+        - "-"
+        - - config-rule
+          - s3_bucket_public_read_prohibited
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt CustomConfigRuleLambdaRole.Arn
+      Runtime: python3.8
+      Timeout: 60
+      Code:
+        S3Bucket: !Ref ConfigRuleLambdaBucket
+        S3Key: lambda/s3-bucket-public-read-prohibited/lambda_function.py.zip
