@@ -5,6 +5,10 @@
 そのため、基本的にはECSのインスタンスを停止する際にドレイニングは必須。
 削除予定のインスタンスに対してドレイニングを有効にすると、既に起動しているタスクは他のインスタンスへ移動するかのような振る舞いをする。
 
+![Draining](https://drive.google.com/file/d/1RklIqUvR8IXM9sx6prKqQKgIFWAO83kE/view?usp=sharing "Draining")
+
+![Drainingなし](https://drive.google.com/file/d/1Sthlfw4Y6qos-lOcuFHaE4LOt1TADsZu/view?usp=sharing "Drainingなし")
+
 
 ## Auto Scalingの設定
 AutoScalingGroupの設定から「通知」タブを押し、インスタンスの終了イベント時に、先ほど作成されたSNSを指定する。
