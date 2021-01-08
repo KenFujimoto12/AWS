@@ -5,9 +5,11 @@
 そのため、基本的にはECSのインスタンスを停止する際にドレイニングは必須。
 削除予定のインスタンスに対してドレイニングを有効にすると、既に起動しているタスクは他のインスタンスへ移動するかのような振る舞いをする。
 
-![Draining](https://user-images.githubusercontent.com/37132477/103963102-d6c5cc80-519b-11eb-8bd0-410418431ef8.png "Draining")
+Draining
+![Draining](https://user-images.githubusercontent.com/37132477/103963298-4045db00-519c-11eb-9c6f-a63fe6a0bfb6.png "Draining")
 
-![Drainingなし](hhttps://user-images.githubusercontent.com/37132477/103963155-ee9d5080-519b-11eb-86cd-5d643ebca4db.png "Drainingなし")
+Drainingなし
+![Drainingなし](https://user-images.githubusercontent.com/37132477/103963332-53f14180-519c-11eb-848c-1625cf8ae6f7.png "Drainingなし")
 
 
 ## Auto Scalingの設定
