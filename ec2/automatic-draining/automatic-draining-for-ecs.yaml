@@ -162,6 +162,7 @@ Resources:
     Type: "AWS::AutoScaling::LifecycleHook"
     Properties:
       AutoScalingGroupName: !Ref EcsInstanceAsg
+      # 900秒立ってもHookが完了しないときはインスタンスを廃棄
       DefaultResult: "ABANDON"
       HeartbeatTimeout: "900"
       LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
