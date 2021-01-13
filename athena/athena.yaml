@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: create AWS Athena work group. Work group is used to issue queries, watch metrics of queries size.
+
+Resources:
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: xxx
+      State: ENABLED
+      WorkGroupConfiguration:
+        # 一回のクエリサイズを制限で来ます。
+        # これによって、誤って非常に思いクエリを投げて料金が跳ね上がる事象を防ぎます。
+        # ここでは2GB
+        BytesScannedCutoffPerQuery: 2000000000
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          OutputLocation: "s3://xxxxxxxxx"
+      Tags:
+        - Key: xxx
+          Value: xxx
