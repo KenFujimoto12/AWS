@@ -1,8 +1,6 @@
 import boto3
 import logging
 
-support = boto3.client('support', region_name='us-east-1')
-
 def get_target_aws_resource():
     detectedResourceList = support.describe_trusted_advisor_checks(
         language='ja'
