@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: create assume role
+
+Properties:
+  AccountId:
+    Type: String
+    Description: xxx
+  PolicyName:
+    Type: String
+    Description: xxx
+
+Resources:
+  AssumeRole:
+    Type: AWS::IAM::ROLE
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub
+                - "arn:aws:iam::${AccountId}:root"
+                - { AccountId: !Ref AccountId }
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - !Ref PolicyName
