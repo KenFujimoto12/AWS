@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: create assume role
+Description: Create assume role. This role allow to access from arn:aws:iam::${AccountId}:root .
 
 Properties:
   AccountId:
@@ -13,6 +13,7 @@ Resources:
   AssumeRole:
     Type: AWS::IAM::ROLE
     Properties:
+      RoleName: assume-role
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
