@@ -13,6 +13,7 @@ Resources:
   AssumeRole:
     Type: AWS::IAM::ROLE
     Properties:
+      RoleName: assume-role
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
