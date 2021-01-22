@@ -84,10 +84,10 @@ def lambda_handler(event, context):
                 if cost == 0:
                     logger.info("No cost!")
                 else:
-                    message = "\n *%s : $ %s*" % (targetDetectionName, math.floor(cost))
+                    message = "\n *%s : $ %s* \n" % (targetDetectionName, math.floor(cost))
                     costList.append(message)
 
-        messages = "======================= `%s` ======================== \n :moneybag: *削減できそうなコスト(合計値)* " % account
+        messages = "======================= `%s` ======================== \n :moneybag: *削減できそうなコスト(合計値)* \n" % account
 
         for message in costList:
             messages += message

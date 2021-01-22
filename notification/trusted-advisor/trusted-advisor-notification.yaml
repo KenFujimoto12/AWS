@@ -1,0 +1,197 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: create trusted advisor notification system
+
+Parameters:
+  SlackChannel:
+    Type: String
+  SlackWebHookUrl:
+    Type: String
+
+Resources:
+  ScheduledRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: ScheduledRule
+      ## 毎週月曜日の10:00にイベント起動
+      ScheduleExpression: 'cron(0 1 ? * SUN *)'
+      State: ENABLED
+      Targets:
+      - Arn: !GetAtt TrustedAdvisorNotificationLambdaFunction.Arn
+        Id: TrustedAdvisorNotificationLambdaFunction
+
+  LambdaPermissionForScheduledEvent:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref TrustedAdvisorNotificationLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduledRule.Arn
+
+  AssumePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: using-other-account-role
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: 'sts:AssumeRole'
+            Resource: '*'
+      Roles:
+        - !Ref LambdaRole
+
+  LambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: trusted-advisor-notification-lambda-policy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*"
+          - Effect: "Allow"
+            Action: logs:CreateLogGroup
+            Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+      Roles:
+        - !Ref LambdaRole
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: trusted-advisor-notification-lambda-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/SecretsManagerReadWrite
+        - arn:aws:iam::aws:policy/AWSSupportAccess
+
+  TrustedAdvisorNotificationLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: trusted-advisor-notification
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.8
+      Timeout: 900
+      Environment:
+        Variables:
+          slackChannel: !Ref SlackChannel
+          slackWebHookUrl: !Ref SlackWebHookUrl
+      Code:
+        ZipFile: !Sub |
+          import json
+          import boto3
+          import logging
+          import os
+          import math
+          from boto3.session import Session
+
+          from urllib.request import Request, urlopen
+          from urllib.error import URLError, HTTPError
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          slackChannel = os.environ['slackChannel']
+          hookUrl = os.environ['slackWebHookUrl']
+
+          # support = boto3.client('support', region_name='us-east-1')
+          sts = boto3.client('sts')
+          secretsmanager = boto3.client('secretsmanager')
+
+          def get_account_ids():
+              getSecretValues = secretsmanager.get_secret_value(
+                  SecretId = "aws/account-ids"
+                  )
+
+              accountIds = json.loads(getSecretValues['SecretString'])
+              return accountIds
+
+          def seitch_session_account(accounId):
+              ## another account session
+              iamRoleArn = 'arn:aws:iam::%s:role/read-only-cross-account-role' % accounId
+              iamRoleSessionName = 'internal'
+
+              response = sts.assume_role(
+                  RoleArn = iamRoleArn,
+                  RoleSessionName = iamRoleSessionName
+                  )
+
+              session = Session(
+                  aws_access_key_id=response['Credentials']['AccessKeyId'],
+                  aws_secret_access_key=response['Credentials']['SecretAccessKey'],
+                  aws_session_token=response['Credentials']['SessionToken']
+                  )
+
+              global support
+              support = session.client('support', region_name='us-east-1')
+
+          def get_target_aws_resource():
+              detectedResourceList = support.describe_trusted_advisor_checks(
+                  language='ja'
+                  )
+              return detectedResourceList
+
+          def get_reduction_cost(id):
+              cost = support.describe_trusted_advisor_check_summaries(
+                  checkIds=[
+                      id,
+                  ]
+              )
+              return cost
+
+          def lambda_handler(event, context):
+              accoundInfo = get_account_ids()
+              accountIds = accoundInfo['accoun-ids']
+
+              for account in accountIds:
+                  accountId = accountIds[account]
+
+                  seitch_session_account(accountId)
+                  detectedResourceList = get_target_aws_resource()
+
+                  targetResouceList = [i for i in detectedResourceList['checks'] if i['category'] == 'cost_optimizing']
+
+                  costList = []
+
+                  for i in targetResouceList:
+                      targetDetectionName = i['name'].replace(' ', '')
+                      cosSummary = get_reduction_cost(i['id'])
+
+                      if cosSummary['summaries'][0]['categorySpecificSummary'].get('costOptimizing') is None:
+                          logger.info("No cost!")
+                      else:
+                          cost = cosSummary['summaries'][0]['categorySpecificSummary']['costOptimizing']['estimatedMonthlySavings']
+                          if cost == 0:
+                              logger.info("No cost!")
+                          else:
+                              message = "\n *%s : $ %s* \n" % (targetDetectionName, math.floor(cost))
+                              costList.append(message)
+
+                  messages = "======================= `%s` ======================== \n :moneybag: *削減できそうなコスト(合計値)* \n" % account
+
+                  for message in costList:
+                      messages += message
+
+                  slackMessage = {
+                      "channel": slackChannel,
+                      "text": messages
+                  }
+
+                  req = Request(hookUrl, json.dumps(slackMessage).encode('utf-8'))
+                  try:
+                      response = urlopen(req)
+                      response.read()
+                      logger.info("Message posted to %s", slackMessage['channel'])
+                  except HTTPError as e:
+                      logger.error("Request failed: %d %s", e.code, e.reason)
+                  except URLError as e:
+                      logger.error("Server connection failed: %s", e.reason)
