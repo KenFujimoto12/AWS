@@ -123,7 +123,7 @@ Resources:
       Timeout: 30
       Environment:
         Variables:
-          slackChannel: "#fto_batch_alarm"
+          slackChannel: "#batch_alarm"
           slackWebHookUr: !Ref SlackWebhookUrl
           project: !Ref Project
           env: !Ref Env

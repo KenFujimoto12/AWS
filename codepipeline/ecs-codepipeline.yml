@@ -19,7 +19,6 @@ Parameters:
     Default: ""
   GitHubOwner:
     Type: String
-    Default: cam-inc
   Repository:
     Type: String
     Default: ""
