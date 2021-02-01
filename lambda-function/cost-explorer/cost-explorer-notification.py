@@ -30,7 +30,6 @@ def seitch_session_account(accounId):
   ## another account session
   iamRoleArn = 'arn:aws:iam::%s:role/read-only-cross-account-role' % accounId
   iamRoleSessionName = 'internal'
-
   response = sts.assume_role(
       RoleArn = iamRoleArn,
       RoleSessionName = iamRoleSessionName
