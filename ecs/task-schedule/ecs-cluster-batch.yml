@@ -5,7 +5,6 @@ Description:
 Parameters:
   Env:
     Type: String
-    Description: "Environment of CAM Service. ex) prd, stg, dev"
     Default: ""
   Project:
     Type: String
